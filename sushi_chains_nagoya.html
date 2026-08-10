@@ -1,0 +1,544 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>名古屋 回転寿司ガイド（スシロー・はま寿司・くら寿司）</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-9ndCyUaIbzAi2FUVXJi0CjmCapSmO7SnpJef0486qhLnuZ2cdeRhO02iuK6FUUVM" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root{
+      --sushiro:#c8102e;
+      --hamazushi:#0068b7;
+      --kurazushi:#1a9c4b;
+      --cream:#fff8ee;
+    }
+
+    body{ background:var(--cream); }
+
+    .navbar-brand{ font-weight:bold; }
+
+    .hero{
+      background:linear-gradient(135deg, var(--sushiro), var(--hamazushi), var(--kurazushi));
+      color:#fff;
+      padding:2.5rem 0;
+      border-radius:0 0 1rem 1rem;
+    }
+
+    .chip{
+      display:inline-block;
+      padding:.2rem .65rem;
+      border-radius:999px;
+      color:#fff;
+      font-size:.78rem;
+      font-weight:600;
+    }
+    .chip-sushiro{ background:var(--sushiro); }
+    .chip-hamazushi{ background:var(--hamazushi); }
+    .chip-kurazushi{ background:var(--kurazushi); }
+
+    .badge-open{ background:#1a9c4b; color:#fff; }
+    .badge-closed{ background:#888; color:#fff; }
+
+    .locate-box{
+      background:#fff;
+      border:1px solid #eee;
+      border-radius:1rem;
+      padding:1.5rem;
+      box-shadow:0 2px 10px rgba(0,0,0,.06);
+    }
+
+    .btn-locate{
+      background:#222;
+      border:none;
+      color:#fff;
+    }
+    .btn-locate:hover{ background:#000; color:#fff; }
+
+    .nearest-card{
+      border:none;
+      border-radius:.75rem;
+      box-shadow:0 2px 8px rgba(0,0,0,.08);
+      height:100%;
+      border-top:5px solid #ccc;
+    }
+    .nearest-card.sushiro{ border-top-color:var(--sushiro); }
+    .nearest-card.hamazushi{ border-top-color:var(--hamazushi); }
+    .nearest-card.kurazushi{ border-top-color:var(--kurazushi); }
+    .nearest-card .distance{
+      font-size:1.6rem;
+      font-weight:bold;
+    }
+
+    #mapid{
+      width:100%;
+      height:500px;
+      border-radius:.75rem;
+      border:2px solid #ddd;
+    }
+
+    .legend-dot{
+      display:inline-block;
+      width:12px;height:12px;
+      border-radius:50%;
+      margin-right:.35rem;
+    }
+
+    table.store-table thead{ background:#222; color:#fff; }
+
+    .filter-btns .btn{ border-radius:999px; }
+
+    footer{
+      background:#2b1a12;
+      color:#f0d9c4;
+    }
+
+    .section-title{
+      border-left:6px solid #222;
+      padding-left:.6rem;
+      margin-bottom:1.2rem;
+    }
+
+    /* カルーセル */
+    .menu-slide{
+      border-radius:1rem;
+      padding:3rem 2rem;
+      color:#fff;
+      text-align:center;
+      min-height:280px;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+    }
+    .menu-slide .emoji{
+      font-size:4rem;
+      line-height:1;
+      margin-bottom:1rem;
+    }
+    .menu-slide h4{ font-weight:bold; }
+    .menu-slide p{ max-width:520px; margin:0 auto; }
+    .carousel-indicators [data-bs-target]{ background:#222; }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar navbar-expand-lg" style="background:#222;">
+    <div class="container">
+      <a class="navbar-brand text-white" href="#top">回転寿司ガイド 名古屋</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <li class="nav-item"><a class="nav-link text-white" href="#menu">看板メニュー</a></li>
+          <li class="nav-item"><a class="nav-link text-white" href="#locate">現在地から探す</a></li>
+          <li class="nav-item"><a class="nav-link text-white" href="#map">地図</a></li>
+          <li class="nav-item"><a class="nav-link text-white" href="#list">店舗一覧</a></li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="hero text-center" id="top">
+    <div class="container">
+      <h1 class="display-6 fw-bold">名古屋 回転寿司ガイド</h1>
+      <p class="mb-0">スシロー・はま寿司・くら寿司の店舗(名古屋市内)を地図と一覧でまとめました。</p>
+    </div>
+  </div>
+
+  <div class="container py-4">
+
+    //看板メニュー
+    <h2 class="section-title" id="menu">各チェーンの看板メニュー</h2>
+    <div id="menuCarousel" class="carousel slide mb-5" data-bs-ride="carousel">
+      <div class="carousel-indicators">
+        <button type="button" data-bs-target="#menuCarousel" data-bs-slide-to="0" class="active"></button>
+        <button type="button" data-bs-target="#menuCarousel" data-bs-slide-to="1"></button>
+        <button type="button" data-bs-target="#menuCarousel" data-bs-slide-to="2"></button>
+      </div>
+      <div class="carousel-inner">
+        <div class="carousel-item active">
+          <div class="menu-slide" style="background:var(--sushiro);">
+            <div class="emoji">🐟</div>
+            <h4>スシロー — 熟成まぐろ</h4>
+            <p>じっくり熟成させたまぐろの旨みが特徴。季節ごとの限定ネタも豊富で、定番から変わりネタまで幅広く楽しめる。</p>
+          </div>
+        </div>
+        <div class="carousel-item">
+          <div class="menu-slide" style="background:var(--hamazushi);">
+            <div class="emoji">🍤</div>
+            <h4>はま寿司 — 大えび握り</h4>
+            <p>プリッとした大きめの海老が乗る一品。リーズナブルな価格帯を中心に、ボリューム感のあるネタが人気。</p>
+          </div>
+        </div>
+        <div class="carousel-item">
+          <div class="menu-slide" style="background:var(--kurazushi);">
+            <div class="emoji">🍣</div>
+            <h4>くら寿司 — 極み炙りサーモン</h4>
+            <p>表面を炙って香ばしさを出したサーモン。5皿ごとに楽しめるカプセルトイ企画などのエンタメ要素も特徴。</p>
+          </div>
+        </div>
+      </div>
+      <button class="carousel-control-prev" type="button" data-bs-target="#menuCarousel" data-bs-slide="prev">
+        <span class="carousel-control-prev-icon"></span>
+      </button>
+      <button class="carousel-control-next" type="button" data-bs-target="#menuCarousel" data-bs-slide="next">
+        <span class="carousel-control-next-icon"></span>
+      </button>
+    </div>
+
+    //現在地から探す
+    <h2 class="section-title" id="locate">現在地から一番近い店舗を探す</h2>
+    <div class="locate-box mb-5">
+      <p>ボタンを押すと、現在地の位置情報を使って、3チェーンそれぞれの一番近い店舗を表示します。</p>
+      <button class="btn btn-locate" id="locateBtn">
+        <i class="bi bi-geo-alt-fill"></i> 現在地から探す
+      </button>
+      <p id="locateStatus" class="text-muted mt-2 mb-0"></p>
+
+      <div class="row g-3 mt-3" id="resultCards" style="display:none;">
+        <div class="col-md-4">
+          <div class="card nearest-card sushiro">
+            <div class="card-body">
+              <span class="chip chip-sushiro">スシロー</span>
+              <h5 class="card-title mt-2" id="res-sushiro-name">-</h5>
+              <p class="card-text mb-1" id="res-sushiro-addr"></p>
+              <p class="card-text mb-1"><i class="bi bi-telephone"></i> <span id="res-sushiro-tel"></span></p>
+              <p class="card-text mb-1" id="res-sushiro-status"></p>
+              <p class="distance mb-0" id="res-sushiro-dist"></p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card nearest-card hamazushi">
+            <div class="card-body">
+              <span class="chip chip-hamazushi">はま寿司</span>
+              <h5 class="card-title mt-2" id="res-hamazushi-name">-</h5>
+              <p class="card-text mb-1" id="res-hamazushi-addr"></p>
+              <p class="card-text mb-1"><i class="bi bi-telephone"></i> <span id="res-hamazushi-tel"></span></p>
+              <p class="card-text mb-1" id="res-hamazushi-status"></p>
+              <p class="distance mb-0" id="res-hamazushi-dist"></p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card nearest-card kurazushi">
+            <div class="card-body">
+              <span class="chip chip-kurazushi">くら寿司</span>
+              <h5 class="card-title mt-2" id="res-kurazushi-name">-</h5>
+              <p class="card-text mb-1" id="res-kurazushi-addr"></p>
+              <p class="card-text mb-1"><i class="bi bi-telephone"></i> <span id="res-kurazushi-tel"></span></p>
+              <p class="card-text mb-1" id="res-kurazushi-status"></p>
+              <p class="distance mb-0" id="res-kurazushi-dist"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    //地図
+    <h2 class="section-title" id="map">地図</h2>
+    <p>
+      <span class="legend-dot" style="background:var(--sushiro);"></span>スシロー
+      <span class="legend-dot ms-3" style="background:var(--hamazushi);"></span>はま寿司
+      <span class="legend-dot ms-3" style="background:var(--kurazushi);"></span>くら寿司
+    </p>
+    <div id="mapid" class="mb-5"></div>
+
+    //店舗一覧 
+    <h2 class="section-title" id="list">店舗一覧</h2>
+
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+      <div class="filter-btns btn-group" role="group">
+        <button type="button" class="btn btn-outline-dark active" data-filter="all">すべて</button>
+        <button type="button" class="btn btn-outline-dark" data-filter="スシロー">スシロー</button>
+        <button type="button" class="btn btn-outline-dark" data-filter="はま寿司">はま寿司</button>
+        <button type="button" class="btn btn-outline-dark" data-filter="くら寿司">くら寿司</button>
+      </div>
+
+      <div>
+        <label for="sortSelect" class="form-label mb-1 small text-muted">並び替え</label>
+        <select id="sortSelect" class="form-select form-select-sm">
+          <option value="default">デフォルト</option>
+          <option value="distance">距離が近い順（現在地取得後）</option>
+          <option value="rating">評価が高い順</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="table-responsive mb-5">
+      <table class="table table-striped table-hover store-table align-middle">
+        <thead>
+          <tr>
+            <th scope="col">チェーン</th>
+            <th scope="col">店舗名</th>
+            <th scope="col">住所</th>
+            <th scope="col">電話番号</th>
+            <th scope="col">評価</th>
+            <th scope="col">営業状況</th>
+          </tr>
+        </thead>
+        <tbody id="storeTableBody">
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <footer class="py-4 mt-3">
+    <div class="container d-flex flex-wrap justify-content-between">
+      <span>学籍番号: 38414109 - サービス工学特論 最終課題</span>
+      <span>データ出典: Google マップ</span>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js" integrity="sha384-geWF76RCwLtnZ8qwWowPQNguL3RmwHVBC9FhGdlKrxdiJJigb/j/68SIy3Te4Bkz" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script>
+    //営業時間スケジュール
+    function sameAllWeek(open, close){
+      var arr = [];
+      for(var i=0;i<7;i++){ arr.push({open:open, close:close}); }
+      return arr;
+    }
+    function weekdayWeekend(wdOpen, wdClose, weOpen, weClose){
+      return [
+        {open:weOpen, close:weClose}, // 日
+        {open:wdOpen, close:wdClose}, // 月
+        {open:wdOpen, close:wdClose}, // 火
+        {open:wdOpen, close:wdClose}, // 水
+        {open:wdOpen, close:wdClose}, // 木
+        {open:wdOpen, close:wdClose}, // 金
+        {open:weOpen, close:weClose}  // 土
+      ];
+    }
+    function kuraSchedule(){
+      // 日・木・金・土: 10:20開店 / 月・火・水: 11:00開店、全日24:00閉店
+      return [
+        {open:10.333, close:24}, // 日
+        {open:11,     close:24}, // 月
+        {open:11,     close:24}, // 火
+        {open:11,     close:24}, // 水
+        {open:10.333, close:24}, // 木
+        {open:10.333, close:24}, // 金
+        {open:10.333, close:24}  // 土
+      ];
+    }
+
+    function isOpenNow(schedule){
+      var now = new Date();
+      var day = now.getDay();
+      var t = now.getHours() + now.getMinutes() / 60;
+      var today = schedule[day];
+      if(t >= today.open && t < today.close){ return true; }
+      var prevDay = (day + 6) % 7;
+      var prev = schedule[prevDay];
+      if(prev.close > 24 && t < (prev.close - 24)){ return true; }
+      return false;
+    }
+
+    // ---------- 店舗データ ----------
+    var stores = [
+      // スシロー
+      {chain:"スシロー", name:"スシロー 名駅店", address:"愛知県名古屋市中村区名駅3丁目26-6 第三KHビル3階", tel:"052-485-7393", lat:35.172102, lng:136.885597, rating:4.4, hours:weekdayWeekend(11,23,10.5,23)},
+      {chain:"スシロー", name:"スシロー 名古屋新栄店", address:"愛知県名古屋市中区新栄1丁目39-5", tel:"052-249-8840", lat:35.163369, lng:136.915661, rating:3.7, hours:weekdayWeekend(11,23,10.5,23)},
+      {chain:"スシロー", name:"スシロー 栄店", address:"愛知県名古屋市中区栄3丁目3-1 マルエイガレリア1", tel:"052-228-8440", lat:35.168436, lng:136.904884, rating:4.4, hours:weekdayWeekend(11,23,10.5,23)},
+      {chain:"スシロー", name:"スシロー 太閧通店", address:"愛知県名古屋市中村区太閧通6丁目51", tel:"052-485-3520", lat:35.168369, lng:136.863433, rating:3.6, hours:weekdayWeekend(11,23,10.5,23)},
+      {chain:"スシロー", name:"スシロー 茶屋坂店", address:"愛知県名古屋市千種区茶屋坂通2丁目50", tel:"052-719-4377", lat:35.183118, lng:136.960431, rating:3.6, hours:weekdayWeekend(11,23,10.5,23)},
+      {chain:"スシロー", name:"スシロー 熱田新尾頭店", address:"愛知県名古屋市熱田区新尾頭3丁目4-35", tel:"052-678-6533", lat:35.137868, lng:136.900132, rating:3.7, hours:weekdayWeekend(11,23,10.5,23)},
+      {chain:"スシロー", name:"スシロー 大道店", address:"愛知県名古屋市南区大道町1丁目16-2", tel:"052-618-2701", lat:35.082417, lng:136.911784, rating:3.5, hours:weekdayWeekend(11,22.5,10.5,22.5)},
+      {chain:"スシロー", name:"スシロー 焼山店", address:"愛知県名古屋市天白区焼山2丁目301", tel:"052-800-5818", lat:35.144694, lng:136.993245, rating:3.6, hours:weekdayWeekend(11,23,10.5,23)},
+      {chain:"スシロー", name:"スシロー 金山店", address:"愛知県名古屋市中区金山1丁目17-1 3階", tel:"052-339-3715", lat:35.143506, lng:136.900699, rating:3.5, hours:weekdayWeekend(11,23,10.5,23)},
+
+      // はま寿司
+      {chain:"はま寿司", name:"はま寿司 港新川町店", address:"愛知県名古屋市港区新川町3丁目地先", tel:"0570-021-286", lat:35.115391, lng:136.877496, rating:3.5, hours:sameAllWeek(7,29)},
+      {chain:"はま寿司", name:"はま寿司 鳴子店", address:"愛知県名古屋市緑区鳴子町1丁目54-1", tel:"0570-021-651", lat:35.097671, lng:136.966623, rating:3.5, hours:sameAllWeek(10,23)},
+      {chain:"はま寿司", name:"はま寿司 新守山店", address:"愛知県名古屋市守山区新守山2406", tel:"0570-021-245", lat:35.204528, lng:136.946657, rating:3.5, hours:sameAllWeek(7,29)},
+      {chain:"はま寿司", name:"はま寿司 東茶屋店", address:"愛知県名古屋市港区東茶屋3丁目78", tel:"0570-021-626", lat:35.103892, lng:136.827284, rating:3.4, hours:sameAllWeek(10,24)},
+      {chain:"はま寿司", name:"はま寿司 天白荒池店", address:"愛知県名古屋市天白区荒池2丁目2304", tel:"0570-021-089", lat:35.114653, lng:137.015093, rating:3.5, hours:weekdayWeekend(11,23,10,23)},
+      {chain:"はま寿司", name:"はま寿司 中村椿町店", address:"愛知県名古屋市中村区椿町6-9 エスカ地下街", tel:"052-452-0320", lat:35.169697, lng:136.880873, rating:3.5, hours:sameAllWeek(11,21.25)},
+
+      // くら寿司
+      {chain:"くら寿司", name:"くら寿司 名古屋栄店", address:"愛知県名古屋市中区栄4丁目2-29 名古屋広小路プレイス2F", tel:"052-251-0610", lat:35.168765, lng:136.910948, rating:3.8, hours:kuraSchedule()},
+      {chain:"くら寿司", name:"くら寿司 今池駅前店", address:"愛知県名古屋市千種区今池5丁目10-1 ドン・キホーテ今池 B2F", tel:"052-439-6107", lat:35.168388, lng:136.937192, rating:2.7, hours:kuraSchedule()},
+      {chain:"くら寿司", name:"くら寿司 名古屋本陣店", address:"愛知県名古屋市中村区本陣通4丁目40", tel:"052-526-6610", lat:35.177360, lng:136.863132, rating:3.5, hours:kuraSchedule()},
+      {chain:"くら寿司", name:"くら寿司 名古屋新栄店", address:"愛知県名古屋市中区新栄2丁目45-26 スポルト名古屋 1F", tel:"052-526-8610", lat:35.161649, lng:136.921758, rating:3.5, hours:kuraSchedule()},
+      {chain:"くら寿司", name:"くら寿司 名古屋明善町店", address:"愛知県名古屋市瑞穂区明善町15-15", tel:"052-825-7610", lat:35.110756, lng:136.922363, rating:3.5, hours:kuraSchedule()},
+      {chain:"くら寿司", name:"くら寿司 名古屋高畑店", address:"愛知県名古屋市中川区高畑3丁目5", tel:"052-369-1006", lat:35.139690, lng:136.853095, rating:3.4, hours:kuraSchedule()},
+      {chain:"くら寿司", name:"くら寿司 柴田本通店", address:"愛知県名古屋市南区柴田本通1丁目3-2", tel:"052-619-6888", lat:35.075906, lng:136.910689, rating:3.3, hours:kuraSchedule()}
+    ];
+
+    var chainColors = {
+      "スシロー": "#c8102e",
+      "はま寿司": "#0068b7",
+      "くら寿司": "#1a9c4b"
+    };
+    var chainKeys = {
+      "スシロー": "sushiro",
+      "はま寿司": "hamazushi",
+      "くら寿司": "kurazushi"
+    };
+
+    // 地図
+    var mymap = L.map('mapid').setView([35.158, 136.924], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', 
+    ).addTo(mymap);
+
+    stores.forEach(function(store){
+      var marker = L.circleMarker([store.lat, store.lng], {
+        radius: 7,
+        color: "#fff",
+        weight: 1,
+        fillColor: chainColors[store.chain],
+        fillOpacity: 0.9
+      }).addTo(mymap);
+      var openBadge = isOpenNow(store.hours) ? "営業中" : "営業時間外";
+      marker.bindPopup("<b>" + store.name + "</b><br>" + store.address + "<br>" + store.tel + "<br>" + openBadge);
+    });
+
+    var userMarker = null;
+    var highlightMarkers = [];
+    var currentUserPos = null; // 現在地取得後にセット
+
+    //店舗一覧
+    var tbody = document.getElementById("storeTableBody");
+
+    function statusBadgeHtml(store){
+      var open = isOpenNow(store.hours);
+      return open
+        ? '<span class="badge badge-open">営業中</span>'
+        : '<span class="badge badge-closed">営業時間外</span>';
+    }
+
+    function renderTable(){
+      var filter = document.querySelector(".filter-btns .btn.active").getAttribute("data-filter");
+      var sortMode = document.getElementById("sortSelect").value;
+
+      var list = stores.slice();
+
+      if(filter !== "all"){
+        list = list.filter(function(s){ return s.chain === filter; });
+      }
+
+      if(sortMode === "rating"){
+        list.sort(function(a,b){ return b.rating - a.rating; });
+      } else if(sortMode === "distance"){
+        if(currentUserPos){
+          list.forEach(function(s){
+            s._dist = distanceKm(currentUserPos.lat, currentUserPos.lng, s.lat, s.lng);
+          });
+          list.sort(function(a,b){ return a._dist - b._dist; });
+        } else {
+          alert("先に「現在地から探す」ボタンで現在地を取得してください。");
+          document.getElementById("sortSelect").value = "default";
+        }
+      }
+
+      tbody.innerHTML = "";
+      list.forEach(function(store){
+        var tr = document.createElement("tr");
+        var distText = (sortMode === "distance" && store._dist !== undefined) ? " (" + store._dist.toFixed(1) + " km)" : "";
+        tr.innerHTML =
+          '<td><span class="chip chip-' + chainKeys[store.chain] + '">' + store.chain + '</span></td>' +
+          '<td>' + store.name + distText + '</td>' +
+          '<td>' + store.address + '</td>' +
+          '<td>' + store.tel + '</td>' +
+          '<td>' + store.rating.toFixed(1) + '</td>' +
+          '<td>' + statusBadgeHtml(store) + '</td>';
+        tbody.appendChild(tr);
+      });
+    }
+
+    document.querySelectorAll(".filter-btns .btn").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        document.querySelectorAll(".filter-btns .btn").forEach(function(b){ b.classList.remove("active"); });
+        btn.classList.add("active");
+        renderTable();
+      });
+    });
+    document.getElementById("sortSelect").addEventListener("change", renderTable);
+
+    renderTable();
+
+    //距離計算
+    function distanceKm(lat1, lon1, lat2, lon2){
+      var R = 6371;
+      var dLat = (lat2 - lat1) * Math.PI / 180;
+      var dLon = (lon2 - lon1) * Math.PI / 180;
+      var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+      var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    //現在地から探すボタン
+    document.getElementById("locateBtn").addEventListener("click", function(){
+      var status = document.getElementById("locateStatus");
+      if(!navigator.geolocation){
+        status.textContent = "この端末では位置情報が利用できません。";
+        return;
+      }
+      status.textContent = "位置情報を取得中...";
+
+      navigator.geolocation.getCurrentPosition(function(pos){
+        var userLat = pos.coords.latitude;
+        var userLng = pos.coords.longitude;
+        currentUserPos = {lat:userLat, lng:userLng};
+        status.textContent = "現在地を取得しました。";
+
+        if(userMarker){ mymap.removeLayer(userMarker); }
+        highlightMarkers.forEach(function(m){ mymap.removeLayer(m); });
+        highlightMarkers = [];
+
+        userMarker = L.marker([userLat, userLng], {
+          icon: L.divIcon({className:"", html:"<div style='background:#111;color:#fff;border-radius:50%;width:16px;height:16px;border:2px solid #fff;'></div>"})
+        }).addTo(mymap).bindPopup("現在地").openPopup();
+
+        var bounds = [[userLat, userLng]];
+
+        ["スシロー", "はま寿司", "くら寿司"].forEach(function(chain){
+          var nearest = null;
+          var nearestDist = Infinity;
+          stores.filter(function(s){ return s.chain === chain; }).forEach(function(s){
+            var d = distanceKm(userLat, userLng, s.lat, s.lng);
+            if(d < nearestDist){
+              nearestDist = d;
+              nearest = s;
+            }
+          });
+
+          var key = chainKeys[chain];
+          document.getElementById("res-" + key + "-name").textContent = nearest.name;
+          document.getElementById("res-" + key + "-addr").textContent = nearest.address;
+          document.getElementById("res-" + key + "-tel").textContent = nearest.tel;
+          document.getElementById("res-" + key + "-dist").textContent = nearestDist.toFixed(1) + " km";
+          document.getElementById("res-" + key + "-status").innerHTML = statusBadgeHtml(nearest);
+
+          var hMarker = L.circleMarker([nearest.lat, nearest.lng], {
+            radius: 11,
+            color: "#111",
+            weight: 3,
+            fillColor: chainColors[chain],
+            fillOpacity: 1
+          }).addTo(mymap).bindPopup("<b>最寄りの" + chain + "</b><br>" + nearest.name);
+          highlightMarkers.push(hMarker);
+          bounds.push([nearest.lat, nearest.lng]);
+        });
+
+        document.getElementById("resultCards").style.display = "flex";
+        mymap.fitBounds(bounds, {padding:[40,40]});
+
+        if(document.getElementById("sortSelect").value === "distance"){
+          renderTable();
+        }
+
+      }, function(err){
+        status.textContent = "位置情報を取得できませんでした（" + err.message + "）。ブラウザの位置情報の許可を確認してください。";
+      });
+    });
+  </script>
+</body>
+</html>
